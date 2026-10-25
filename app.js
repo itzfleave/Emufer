@@ -284,6 +284,7 @@ function stopGame(silent){
   objUrls.forEach(u=>URL.revokeObjectURL(u));objUrls=[];
   $("empty").style.display="grid";$("hud").style.display="none";
   running=false;sessionStart=0;
+  renderTouchController();
 ["fullscreen","reload","stop"].forEach(i=>$(i).disabled=true);
   $("start").disabled=false;$("nowPlaying").textContent="";$("timer").textContent="Session: 0:00";
   if(!silent)setStatus("Stopped. Your progress was autosaved.");
@@ -297,6 +298,7 @@ async function launch(file,system,bios,opts){
   const tok=++startToken;
   const id=gameId(file);
   current={file,bios,system,id,backupDone:false};
+  renderTouchController();
   $("start").disabled=true;$("nowPlaying").textContent=file.name;
   setStatus("Starting "+file.name+"…");
 
@@ -359,6 +361,7 @@ window.addEventListener("message",e=>{
   const d=e.data;if(!d||!d.emufer)return;
   if(d.emufer==="start"){
     running=true;clearTimeout(watchdog);$("start").disabled=false;$("fullscreen").disabled=false;
+    renderTouchController();
     sessionStart=Date.now();lastTickAt=sessionStart;clearInterval(sessionTimer);
     sessionTimer=setInterval(()=>{$("timer").textContent="Session: "+fmtTime(Date.now()-sessionStart);if(Date.now()-lastTickAt>30000)recordPlaytime()},1000);
     setStatus((current&&current.resumed?"Resumed from your last autosave. ":"Playing. ")+(current?current.file.name:""),"good");
@@ -526,6 +529,79 @@ async function restoreSaves(file){
 $("backup").onclick=backupSaves;
 $("restore").onclick=()=>$("restoreFile").click();
 $("restoreFile").onchange=()=>{const f=$("restoreFile").files[0];if(f)restoreSaves(f);$("restoreFile").value=""};
+
+/* =====================  TOUCH CONTROLLER  ===================== */
+const TOUCH_LABELS={
+  nes:{0:"B",8:"A",1:"",9:"",10:"",11:""},
+  snes:{0:"B",1:"Y",8:"A",9:"X",10:"L",11:"R"},
+  gb:{0:"B",8:"A",1:"",9:"",10:"",11:""},
+  gbc:{0:"B",8:"A",1:"",9:"",10:"",11:""},
+  gba:{0:"B",8:"A",1:"",9:"",10:"L",11:"R"},
+  n64:{0:"B",8:"A",1:"C←",9:"C↑",10:"L",11:"R",12:"Z",13:"Z"},
+  segaMD:{0:"B",1:"C",8:"A",9:"X",10:"Y",11:"Z"},
+  segaMS:{0:"1",8:"2",1:"",9:""},
+  segaGG:{0:"1",8:"2",1:"",9:""},
+  psx:{0:"✕",1:"□",8:"○",9:"△",10:"L1",11:"R1",12:"L2",13:"R2"},
+  psp:{0:"✕",1:"□",8:"○",9:"△",10:"L",11:"R"},
+  segaSaturn:{0:"B",1:"Y",8:"A",9:"X",10:"L",11:"R"},
+  arcade:{0:"B1",1:"B2",8:"B3",9:"B4",10:"B5",11:"B6"},
+  neogeo:{0:"B",1:"D",8:"A",9:"C"},
+  atari2600:{0:"Fire",8:"Fire",1:"",9:""},
+  atari5200:{0:"1",8:"2",1:"",9:""},
+  atari7800:{0:"B",8:"A",1:"",9:""},
+  lynx:{0:"B",8:"A",1:"",9:""},
+  default:{0:"B",1:"Y",8:"A",9:"X",10:"L",11:"R"}
+};
+const TOUCH_KEYS={8:"Backspace",9:"Tab",13:"Enter",16:"Shift",17:"Control",18:"Alt",32:" ",37:"ArrowLeft",38:"ArrowUp",39:"ArrowRight",40:"ArrowDown"};
+function keyCodeFromName(name){
+  if(!name)return 0;
+  const n=String(name).toLowerCase();
+  const special={"backspace":8,"tab":9,"enter":13,"shift":16,"ctrl":17,"alt":18,"space":32,"left arrow":37,"up arrow":38,"right arrow":39,"down arrow":40};
+  if(special[n])return special[n];
+  if(n.length===1)return n.toUpperCase().charCodeAt(0);
+  return 0;
+}
+function touchKeyEvent(index,type){
+  const entry=(controls[0]||{})[index]||{};
+  const name=entry.value;
+  if(!name)return;
+  const code=keyCodeFromName(name);
+  const key=TOUCH_KEYS[code]||(name.length===1?name.toLowerCase():name);
+  const f=frame();if(!f)return;
+  try{
+    const w=f.contentWindow,d=f.contentDocument;
+    const ev=new w.KeyboardEvent(type,{key,code:key.length===1?"Key"+key.toUpperCase():key,keyCode:code,which:code,bubbles:true,cancelable:true});
+    d.dispatchEvent(ev);w.dispatchEvent(new w.KeyboardEvent(type,{key,code:key.length===1?"Key"+key.toUpperCase():key,keyCode:code,which:code,bubbles:true,cancelable:true}));
+  }catch(e){}
+}
+function renderTouchController(){
+  const root=$("touchControls");if(!root)return;
+  const touchCapable=("ontouchstart" in window)||(navigator.maxTouchPoints||0)>0||matchMedia("(pointer: coarse)").matches;
+  root.classList.toggle("show",!!(running&&touchCapable));
+  const id=current&&current.system;
+  const labels=TOUCH_LABELS[id]||TOUCH_LABELS.default;
+  root.querySelectorAll("[data-index]").forEach(b=>{
+    const idx=+b.dataset.index;
+    let label=labels[idx];
+    if(label===undefined)label=({2:"SELECT",3:"START",4:"▲",5:"▼",6:"◀",7:"▶"}[idx]||"");
+    b.textContent=label;
+    b.style.display=label?"grid":"none";
+    b.setAttribute("aria-label",({2:"Select",3:"Start",4:"D-pad up",5:"D-pad down",6:"D-pad left",7:"D-pad right"}[idx]||label||"Button"));
+  });
+}
+(function initTouchController(){
+  const root=$("touchControls");if(!root)return;
+  let held=null;
+  const release=()=>{if(held!==null){touchKeyEvent(held,"keyup");const b=root.querySelector('[data-index="'+held+'"]');if(b)b.classList.remove("pressed");held=null}};
+  root.querySelectorAll(".vc-btn").forEach(b=>{
+    b.addEventListener("pointerdown",e=>{e.preventDefault();const idx=+b.dataset.index;if(held!==null&&held!==idx)release();held=idx;touchKeyEvent(idx,"keydown");b.classList.add("pressed");try{b.setPointerCapture(e.pointerId)}catch(err){}});
+    ["pointerup","pointercancel","lostpointercapture"].forEach(type=>b.addEventListener(type,e=>{if(held===+b.dataset.index)release()}));
+    b.addEventListener("contextmenu",e=>e.preventDefault());
+  });
+  window.addEventListener("blur",release);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)release()});
+  window.addEventListener("resize",renderTouchController);
+})();
 
 /* =====================  GAMEPAD INDICATOR  ===================== */
 function padCheck(){
