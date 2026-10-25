@@ -591,15 +591,16 @@ function renderTouchController(){
 }
 (function initTouchController(){
   const root=$("touchControls");if(!root)return;
-  let held=null;
-  const release=()=>{if(held!==null){touchKeyEvent(held,"keyup");const b=root.querySelector('[data-index="'+held+'"]');if(b)b.classList.remove("pressed");held=null}};
+  const held=new Map();
+  const releaseOne=(pointerId)=>{const idx=held.get(pointerId);if(idx===undefined)return;held.delete(pointerId);if(![...held.values()].includes(idx)){touchKeyEvent(idx,"keyup");const b=root.querySelector('[data-index="'+idx+'"]');if(b)b.classList.remove("pressed")}};
+  const releaseAll=()=>{for(const id of [...held.keys()])releaseOne(id)};
   root.querySelectorAll(".vc-btn").forEach(b=>{
-    b.addEventListener("pointerdown",e=>{e.preventDefault();const idx=+b.dataset.index;if(held!==null&&held!==idx)release();held=idx;touchKeyEvent(idx,"keydown");b.classList.add("pressed");try{b.setPointerCapture(e.pointerId)}catch(err){}});
-    ["pointerup","pointercancel","lostpointercapture"].forEach(type=>b.addEventListener(type,e=>{if(held===+b.dataset.index)release()}));
+    b.addEventListener("pointerdown",e=>{e.preventDefault();const idx=+b.dataset.index;if([...held.values()].includes(idx))return;held.set(e.pointerId,idx);touchKeyEvent(idx,"keydown");b.classList.add("pressed");try{b.setPointerCapture(e.pointerId)}catch(err){}});
+    ["pointerup","pointercancel","lostpointercapture"].forEach(type=>b.addEventListener(type,e=>releaseOne(e.pointerId)));
     b.addEventListener("contextmenu",e=>e.preventDefault());
   });
-  window.addEventListener("blur",release);
-  document.addEventListener("visibilitychange",()=>{if(document.hidden)release()});
+  window.addEventListener("blur",releaseAll);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)releaseAll()});
   window.addEventListener("resize",renderTouchController);
 })();
 
