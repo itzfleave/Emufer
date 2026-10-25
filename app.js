@@ -284,8 +284,7 @@ function stopGame(silent){
   objUrls.forEach(u=>URL.revokeObjectURL(u));objUrls=[];
   $("empty").style.display="grid";$("hud").style.display="none";
   running=false;sessionStart=0;
-  updateVpadVisibility();
-  ["fullscreen","reload","stop"].forEach(i=>$(i).disabled=true);
+["fullscreen","reload","stop"].forEach(i=>$(i).disabled=true);
   $("start").disabled=false;$("nowPlaying").textContent="";$("timer").textContent="Session: 0:00";
   if(!silent)setStatus("Stopped. Your progress was autosaved.");
 }
@@ -366,8 +365,8 @@ window.addEventListener("message",e=>{
     try{frame().focus();frame().contentWindow.focus()}catch(err){}
     scheduleAutosave();
     if($("autoFs").checked)toggleFs();
-    buildVpad(current&&current.system);updateVpadVisibility();
-  }else if(d.emufer==="ready"){setStatus("Emulator core loaded; preparing game…")}
+// Keep pad above the emulator iframe
+}else if(d.emufer==="ready"){setStatus("Emulator core loaded; preparing game…")}
   else if(d.emufer==="cdnfail"){$("start").disabled=false;setStatus("Could not load the emulator files from "+($("cdn").value==="local"?"the bundled data/ folder. Make sure the data folder is next to index.html":"the online CDN. Check your internet connection")+".","bad")}
 });
 
@@ -535,256 +534,6 @@ function padCheck(){
 }
 window.addEventListener("gamepadconnected",padCheck);window.addEventListener("gamepaddisconnected",padCheck);
 
-
-/* =====================  VIRTUAL ON-SCREEN CONTROLLER  ===================== */
-/*
-  Shows authentic console button names and maps touches to the same control
-  indices / keyboard keys that EmulatorJS already uses.
-  Visible by default on touch devices / narrow screens; toggleable anywhere.
-*/
-const VPAD_LAYOUTS = {
-  // NES / Famicom / Master System / Game Gear / Atari 2600 style
-  simple: {
-    face: [[8,"A"],[0,"B"]],
-    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Select"]]
-  },
-  // Game Boy / GBC
-  gb: {
-    face: [[8,"A"],[0,"B"]],
-    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Select"]]
-  },
-  // SNES / GBA / PCE / WonderSwan / Neo Geo Pocket
-  snes: {
-    face: [[8,"A"],[0,"B"],[9,"X"],[1,"Y"]],
-    dpad: true, shoulders: [[10,"L"],[11,"R"]], meta: [[3,"Start"],[2,"Select"]]
-  },
-  // N64 (simplified – D-pad + A/B + C-up as X + L/R + Start)
-  n64: {
-    face: [[8,"A"],[0,"B"],[9,"C↑"],[1,"C←"]],
-    dpad: true, shoulders: [[10,"L"],[11,"R"],[12,"Z"]], meta: [[3,"Start"]]
-  },
-  // PlayStation / PSP / Saturn face layout
-  psx: {
-    face: [[8,"○"],[0,"✕"],[9,"△"],[1,"□"]],
-    dpad: true, shoulders: [[10,"L1"],[11,"R1"],[12,"L2"],[13,"R2"]], meta: [[3,"Start"],[2,"Select"]]
-  },
-  // Arcade / Neo Geo
-  arcade: {
-    face: [[8,"A"],[0,"B"],[9,"C"],[1,"D"]],
-    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Coin"]]
-  },
-  // Generic 6-button (fallback)
-  full: {
-    face: [[8,"A"],[0,"B"],[9,"X"],[1,"Y"]],
-    dpad: true, shoulders: [[10,"L"],[11,"R"],[12,"L2"],[13,"R2"]], meta: [[3,"Start"],[2,"Select"]]
-  }
-};
-
-function vpadLayoutFor(systemId){
-  const map = {
-    nes:"simple", segaMS:"simple", segaGG:"simple", atari2600:"simple",
-    gb:"gb", gbc:"gb",
-    snes:"snes", gba:"snes", pce:"snes", wswan:"snes", wswanc:"snes", ngp:"snes", ngpc:"snes",
-    coleco:"simple", atari7800:"simple", lynx:"snes",
-    n64:"n64",
-    psx:"psx", psp:"psx", segaSaturn:"psx", segaCD:"snes", sega32x:"snes", segaMD:"snes",
-    arcade:"arcade", neogeo:"arcade",
-    nds:"snes", vb:"simple",
-    atari5200:"snes", jaguar:"full", "3do":"psx", pcfx:"psx"
-  };
-  return VPAD_LAYOUTS[map[systemId] || "full"];
-}
-
-let vpadVisible = false;
-let vpadForced = null; // null = auto, true/false = forced
-
-function isTouchDevice(){
-  return ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
-         (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-}
-function isNarrow(){
-  return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
-}
-
-function shouldShowVpad(){
-  if(vpadForced !== null) return vpadForced;
-  // Auto: show on touch or narrow screens, or when no physical gamepad
-  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
-  return isTouchDevice() || isNarrow() || pads.length === 0;
-}
-
-function keyNameForIndex(idx){
-  const c = (controls[0] || {})[idx];
-  return (c && c.value) || null;
-}
-
-// Map EmulatorJS key names back to KeyboardEvent key/code
-const KEY_TO_EVENT = {
-  "up arrow":{key:"ArrowUp",code:"ArrowUp",keyCode:38},
-  "down arrow":{key:"ArrowDown",code:"ArrowDown",keyCode:40},
-  "left arrow":{key:"ArrowLeft",code:"ArrowLeft",keyCode:37},
-  "right arrow":{key:"ArrowRight",code:"ArrowRight",keyCode:39},
-  "enter":{key:"Enter",code:"Enter",keyCode:13},
-  "space":{key:" ",code:"Space",keyCode:32},
-  "tab":{key:"Tab",code:"Tab",keyCode:9},
-  "backspace":{key:"Backspace",code:"Backspace",keyCode:8},
-  "shift":{key:"Shift",code:"ShiftLeft",keyCode:16},
-  "ctrl":{key:"Control",code:"ControlLeft",keyCode:17},
-  "alt":{key:"Alt",code:"AltLeft",keyCode:18},
-  "escape":{key:"Escape",code:"Escape",keyCode:27}
-};
-// letters & digits
-for(let i=65;i<=90;i++){
-  const ch = String.fromCharCode(i).toLowerCase();
-  KEY_TO_EVENT[ch] = {key:ch, code:"Key"+ch.toUpperCase(), keyCode:i};
-}
-for(let i=0;i<=9;i++){
-  KEY_TO_EVENT[String(i)] = {key:String(i), code:"Digit"+i, keyCode:48+i};
-}
-
-function dispatchEmuKey(keyName, down){
-  if(!keyName) return;
-  const info = KEY_TO_EVENT[keyName.toLowerCase()];
-  if(!info) return;
-  const target = (()=>{
-    try{
-      const fr = frame();
-      if(fr && fr.contentWindow) return fr.contentWindow.document;
-    }catch(e){}
-    return document;
-  })();
-  const ev = new KeyboardEvent(down ? "keydown" : "keyup", {
-    key: info.key, code: info.code, keyCode: info.keyCode, which: info.keyCode,
-    bubbles: true, cancelable: true, view: window
-  });
-  try{ target.dispatchEvent(ev); }catch(e){}
-  // Also try the iframe window itself (some cores listen there)
-  try{
-    const fr = frame();
-    if(fr && fr.contentWindow) fr.contentWindow.dispatchEvent(ev);
-  }catch(e){}
-}
-
-const vpadActive = new Set(); // indices currently held
-
-function vpadPress(idx, down){
-  if(down){
-    if(vpadActive.has(idx)) return;
-    vpadActive.add(idx);
-  }else{
-    if(!vpadActive.has(idx)) return;
-    vpadActive.delete(idx);
-  }
-  const key = keyNameForIndex(idx);
-  dispatchEmuKey(key, down);
-}
-
-function bindVpadButton(el, idx){
-  const start = (e)=>{ e.preventDefault(); e.stopPropagation(); el.classList.add("active"); vpadPress(idx, true); };
-  const end = (e)=>{ e.preventDefault(); e.stopPropagation(); el.classList.remove("active"); vpadPress(idx, false); };
-  el.addEventListener("pointerdown", start);
-  el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", end);
-  el.addEventListener("pointerleave", end);
-  // Prevent context menu / long-press
-  el.addEventListener("contextmenu", e=>e.preventDefault());
-}
-
-function buildVpad(systemId){
-  const layout = vpadLayoutFor(systemId || ($("system") && $("system").value) || "nes");
-  const left = $("vpadLeft"), right = $("vpadRight"), top = $("vpadTop");
-  if(!left) return;
-  left.innerHTML = ""; right.innerHTML = ""; top.innerHTML = "";
-
-  // D-pad
-  if(layout.dpad){
-    const dpad = document.createElement("div");
-    dpad.className = "dpad";
-    [["up",4,"▲"],["down",5,"▼"],["left",6,"◀"],["right",7,"▶"]].forEach(([cls,idx,lab])=>{
-      const b = document.createElement("button");
-      b.className = "btn " + cls;
-      b.type = "button";
-      b.textContent = lab;
-      b.setAttribute("aria-label", lab);
-      bindVpadButton(b, idx);
-      dpad.appendChild(b);
-    });
-    left.appendChild(dpad);
-  }
-
-  // Face buttons
-  const face = document.createElement("div");
-  face.className = "face";
-  layout.face.forEach(([idx, lab])=>{
-    const b = document.createElement("button");
-    b.className = "btn b" + idx;
-    b.type = "button";
-    b.textContent = lab;
-    b.setAttribute("aria-label", lab);
-    bindVpadButton(b, idx);
-    face.appendChild(b);
-  });
-  right.appendChild(face);
-
-  // Shoulders + meta (Start/Select) in the top bar
-  const shoulders = document.createElement("div");
-  shoulders.className = "shoulders";
-  (layout.shoulders || []).forEach(([idx, lab])=>{
-    const b = document.createElement("button");
-    b.className = "btn small";
-    b.type = "button";
-    b.textContent = lab;
-    bindVpadButton(b, idx);
-    shoulders.appendChild(b);
-  });
-  top.appendChild(shoulders);
-  (layout.meta || []).forEach(([idx, lab])=>{
-    const b = document.createElement("button");
-    b.className = "btn tiny";
-    b.type = "button";
-    b.textContent = lab;
-    bindVpadButton(b, idx);
-    top.appendChild(b);
-  });
-}
-
-function updateVpadVisibility(){
-  const el = $("vpad");
-  if(!el) return;
-  const show = running && shouldShowVpad();
-  vpadVisible = show;
-  el.classList.toggle("show", show);
-  el.setAttribute("aria-hidden", show ? "false" : "true");
-  const btn = $("vpadToggle");
-  if(btn) btn.textContent = show ? "🎛 Pad ✓" : "🎛 Pad";
-}
-
-function initVpad(){
-  const btn = $("vpadToggle");
-  if(btn){
-    btn.addEventListener("click", ()=>{
-      if(vpadForced === null) vpadForced = !shouldShowVpad();
-      else vpadForced = !vpadForced;
-      updateVpadVisibility();
-      if(vpadForced) buildVpad(current ? current.system : $("system").value);
-    });
-  }
-  // Rebuild when system changes
-  $("system").addEventListener("change", ()=>{
-    if(vpadVisible || shouldShowVpad()) buildVpad($("system").value);
-  });
-  window.addEventListener("resize", ()=>{ updateVpadVisibility(); });
-  window.addEventListener("gamepadconnected", ()=>{ updateVpadVisibility(); });
-  window.addEventListener("gamepaddisconnected", ()=>{ updateVpadVisibility(); });
-  // Release all buttons if the page loses focus
-  document.addEventListener("visibilitychange", ()=>{
-    if(document.hidden){
-      [...vpadActive].forEach(idx => vpadPress(idx, false));
-      document.querySelectorAll("#vpad .btn.active").forEach(b => b.classList.remove("active"));
-    }
-  });
-}
-
 /* =====================  INIT  ===================== */
 (async function init(){
   buildSelects();
@@ -801,5 +550,4 @@ function initVpad(){
   await renderLibrary();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   setupContinue();
-  initVpad();
 })();
