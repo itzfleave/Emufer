@@ -123,25 +123,28 @@ table.ctl .cell.wait{border-color:var(--warn);color:var(--warn);animation:bl 1s 
 .ctl-scroll{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
 dialog.big{max-width:720px}
 .badge{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--accent-dim);color:var(--accent2);margin-left:6px}
-position:absolute; inset:0; pointer-events:none; z-index:20;
-  display:none; touch-action:none; user-select:none;
-}
-  width:48px; height:48px; border-radius:50%;
-  background:rgba(20,30,20,.72); border:2px solid rgba(74,222,128,.45);
-  color:#e8efe8; font:700 13px/1 system-ui,sans-serif;
-  display:grid; place-items:center; backdrop-filter:blur(4px);
-  box-shadow:0 4px 14px #0008, inset 0 1px 0 #ffffff22;
-  transition:transform .08s, background .08s, border-color .08s;
-  -webkit-tap-highlight-color:transparent;
-}
-  transform:scale(.92); background:rgba(34,197,94,.55); border-color:#4ade80;
-}
-  position:relative; width:120px; height:120px;
-}
-  position:absolute; width:40px; height:40px; border-radius:8px;
-}
-  position:relative; width:130px; height:130px;
-}
+/* On-screen controller: pointer events only reach the controls, not the game iframe. */
+#touchControls{position:absolute;inset:0;pointer-events:none;z-index:20;display:none;touch-action:none;user-select:none;-webkit-user-select:none}
+#touchControls.show{display:block}
+#touchControls .vc-btn{pointer-events:auto;position:absolute;min-width:42px;height:42px;border-radius:50%;padding:0 8px;background:rgba(20,30,20,.78);border:2px solid rgba(74,222,128,.55);color:#e8efe8;font:750 12px/1 system-ui,sans-serif;display:grid;place-items:center;backdrop-filter:blur(4px);box-shadow:0 4px 14px #0008,inset 0 1px 0 #ffffff22;touch-action:none;-webkit-tap-highlight-color:transparent}
+#touchControls .vc-btn.pressed{transform:scale(.92);background:rgba(34,197,94,.65);border-color:#4ade80}
+#touchControls .vc-dpad{position:absolute;left:12px;bottom:14px;width:132px;height:132px;pointer-events:none}
+#touchControls .vc-dpad .vc-btn{width:42px;height:42px;border-radius:9px}
+#touchControls [data-index="4"]{left:45px;top:0}
+#touchControls [data-index="5"]{left:45px;bottom:0}
+#touchControls [data-index="6"]{left:0;top:45px}
+#touchControls [data-index="7"]{right:0;top:45px}
+#touchControls .vc-actions{position:absolute;right:12px;bottom:16px;width:154px;height:132px;pointer-events:none}
+#touchControls .vc-actions .vc-btn{width:48px;height:48px}
+#touchControls [data-index="0"]{left:0;top:43px}
+#touchControls [data-index="1"]{left:43px;top:0}
+#touchControls [data-index="8"]{right:0;top:43px}
+#touchControls [data-index="9"]{left:43px;bottom:0}
+#touchControls .vc-meta{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;pointer-events:none}
+#touchControls .vc-meta .vc-btn{position:static;width:auto;min-width:58px;height:34px;border-radius:8px;pointer-events:auto}
+#touchControls .vc-shoulders{position:absolute;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;pointer-events:none}
+#touchControls .vc-shoulders .vc-btn{position:static;min-width:54px;width:auto;height:34px;border-radius:8px;pointer-events:auto}
+@media(max-width:600px){#touchControls .vc-dpad{left:8px;bottom:10px;transform:scale(.9);transform-origin:bottom left}#touchControls .vc-actions{right:8px;bottom:10px;transform:scale(.9);transform-origin:bottom right}#touchControls .vc-meta{bottom:12px}#touchControls .vc-shoulders{left:8px;right:8px;top:8px}}
 @media(max-width:600px){
   #stage{height:clamp(280px,50vh,520px)}
   .toolbar button{flex:1 1 90px; font-size:13px; padding:8px 6px}
@@ -225,9 +228,29 @@ position:absolute; inset:0; pointer-events:none; z-index:20;
     <h2><span>Player</span><span class="grow"></span><span class="muted" id="nowPlaying" style="text-transform:none;letter-spacing:0;font-weight:500"></span></h2>
     <div id="stage">
       <div id="hud"></div>
-</div>
-
       <div class="empty" id="empty"><div><div class="big">▶</div><strong>Your game appears here</strong><p>Pick a system &amp; file, or click a game in your library.</p><p class="muted">Drop a ROM onto this window to start instantly.</p></div></div>
+      <div id="touchControls" aria-label="On-screen game controller">
+        <div class="vc-shoulders">
+          <button type="button" class="vc-btn" data-index="10">L</button>
+          <button type="button" class="vc-btn" data-index="11">R</button>
+        </div>
+        <div class="vc-dpad">
+          <button type="button" class="vc-btn" data-index="4" aria-label="Up">▲</button>
+          <button type="button" class="vc-btn" data-index="5" aria-label="Down">▼</button>
+          <button type="button" class="vc-btn" data-index="6" aria-label="Left">◀</button>
+          <button type="button" class="vc-btn" data-index="7" aria-label="Right">▶</button>
+        </div>
+        <div class="vc-actions">
+          <button type="button" class="vc-btn" data-index="0">B</button>
+          <button type="button" class="vc-btn" data-index="1">Y</button>
+          <button type="button" class="vc-btn" data-index="8">A</button>
+          <button type="button" class="vc-btn" data-index="9">X</button>
+        </div>
+        <div class="vc-meta">
+          <button type="button" class="vc-btn" data-index="2">SELECT</button>
+          <button type="button" class="vc-btn" data-index="3">START</button>
+        </div>
+      </div>
     </div>
     <div class="toolbar">
       <button class="secondary" id="fullscreen" disabled>⛶ Fullscreen</button>
