@@ -1,4 +1,4 @@
-# EmuHub local server (Windows PowerShell 5+). Serves this folder on http://127.0.0.1:8765/
+# Emufer local server (Windows PowerShell 5+). Serves this folder on http://127.0.0.1:8765/
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $port = 8765
@@ -10,11 +10,11 @@ $mimes = @{
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add($prefix)
 try { $listener.Start() } catch {
-  Write-Host "Could not start the server on port $port. Is another EmuHub window already open?" -ForegroundColor Red
+  Write-Host "Could not start the server on port $port. Is another Emufer window already open?" -ForegroundColor Red
   exit 1
 }
 Start-Process "${prefix}index.html"
-Write-Host "EmuHub is running at ${prefix}index.html"
+Write-Host "Emufer is running at ${prefix}index.html"
 Write-Host "Close this window to stop the server."
 try {
   while ($listener.IsListening) {
