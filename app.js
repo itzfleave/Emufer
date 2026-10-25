@@ -46,8 +46,8 @@ const ACCEPT=".nes,.unf,.unif,.fds,.smc,.sfc,.swc,.fig,.gb,.gbc,.gba,.z64,.n64,.
 
 /* =====================  STORAGE  ===================== */
 const store={
-  get(k,d){try{const v=localStorage.getItem("emuhub."+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
-  set(k,v){try{localStorage.setItem("emuhub."+k,JSON.stringify(v))}catch(e){}}
+  get(k,d){try{const v=localStorage.getItem("emufer."+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("emufer."+k,JSON.stringify(v))}catch(e){}}
 };
 function makeDB(name,storeName){
   return{
@@ -64,8 +64,8 @@ function makeDB(name,storeName){
     del(id){return new Promise(res=>{if(!this.db)return res(false);const t=this.db.transaction(storeName,"readwrite");t.objectStore(storeName).delete(id);t.oncomplete=()=>res(true);t.onerror=()=>res(false)})}
   };
 }
-const DB=makeDB("emuhub-library","games");      // game files + stats
-const STATES=makeDB("emuhub-states","states");  // autosave per game
+const DB=makeDB("emufer-library","games");      // game files + stats
+const STATES=makeDB("emufer-states","states");  // autosave per game
 
 /* =====================  STATE  ===================== */
 let current=null;                 // {file,bios,system,id}
@@ -106,7 +106,7 @@ function updateBiosHint(){
 function initIso(){
   const p=$("isoPill");
   if(iso){p.textContent="Isolation: on";p.classList.add("ok")}
-  else{p.textContent="Isolation: off (PSP/DOS need it)";p.title="Start EmuHub with Start_EmuHub.bat / serve.py in Chrome or Edge"}
+  else{p.textContent="Isolation: off (PSP/DOS need it)";p.title="Start Emufer with serve.py or server.ps1 in Chrome or Edge"}
 }
 
 /* =====================  MULTI-FILE (cue+bin) → ZIP  ===================== */
@@ -284,6 +284,7 @@ function stopGame(silent){
   objUrls.forEach(u=>URL.revokeObjectURL(u));objUrls=[];
   $("empty").style.display="grid";$("hud").style.display="none";
   running=false;sessionStart=0;
+  updateVpadVisibility();
   ["fullscreen","reload","stop"].forEach(i=>$(i).disabled=true);
   $("start").disabled=false;$("nowPlaying").textContent="";$("timer").textContent="Session: 0:00";
   if(!silent)setStatus("Stopped. Your progress was autosaved.");
@@ -292,7 +293,7 @@ async function launch(file,system,bios,opts){
   opts=opts||{};
   if(!file){setStatus("Please choose a game file first.","bad");return}
   const sys=SYS[system];if(!sys){setStatus("Unknown system.","bad");return}
-  if(sys.needsIso&&!iso){setStatus(sys.n.split(" (")[0]+" needs a cross-origin-isolated page. Start EmuHub with Start_EmuHub.bat / serve.py in Chrome or Edge (not by opening index.html directly).","bad");return}
+  if(sys.needsIso&&!iso){setStatus(sys.n.split(" (")[0]+" needs a cross-origin-isolated page. Start Emufer with serve.py or server.ps1 in Chrome or Edge (not by opening index.html directly).","bad");return}
   stopGame(true);
   const tok=++startToken;
   const id=gameId(file);
@@ -337,10 +338,10 @@ async function launch(file,system,bios,opts){
   'window.EJS_threads=O.threads;if(O.biosUrl)window.EJS_biosUrl=O.biosUrl;if(O.stateUrl)window.EJS_loadStateURL=O.stateUrl;\n'+
   'window.EJS_defaultControls=O.controls;window.EJS_disableAutoLang=true;window.EJS_language="en-US";\n'+
   'window.EJS_defaultOptions={"save-save-interval":O.interval&&O.interval!=="0"?O.interval:"30"};if(O.shader)window.EJS_defaultOptions.shader=O.shader;\n'+
-  'window.EJS_onGameStart=function(){parent.postMessage({emuhub:"start"},"*")};\n'+
-  'window.EJS_ready=function(){parent.postMessage({emuhub:"ready"},"*")};\n'+
-  'window.addEventListener("error",function(e){if(e&&e.message)parent.postMessage({emuhub:"error",msg:String(e.message)},"*")});\n'+
-  '<\/script><script src="'+o.pathtodata+'loader.js" onerror="parent.postMessage({emuhub:\'cdnfail\'},\'*\')"><\/script></body></html>';
+  'window.EJS_onGameStart=function(){parent.postMessage({emufer:"start"},"*")};\n'+
+  'window.EJS_ready=function(){parent.postMessage({emufer:"ready"},"*")};\n'+
+  'window.addEventListener("error",function(e){if(e&&e.message)parent.postMessage({emufer:"error",msg:String(e.message)},"*")});\n'+
+  '<\/script><script src="'+o.pathtodata+'loader.js" onerror="parent.postMessage({emufer:\'cdnfail\'},\'*\')"><\/script></body></html>';
 
   const f=document.createElement("iframe");
   f.setAttribute("allow","autoplay; fullscreen; gamepad; cross-origin-isolated; clipboard-write");
@@ -356,8 +357,8 @@ async function launch(file,system,bios,opts){
   watchdog=setTimeout(()=>{if(!running)setStatus("Still loading… big games can take a minute. If nothing happens, check the console choice, BIOS and file format.")},40000);
 }
 window.addEventListener("message",e=>{
-  const d=e.data;if(!d||!d.emuhub)return;
-  if(d.emuhub==="start"){
+  const d=e.data;if(!d||!d.emufer)return;
+  if(d.emufer==="start"){
     running=true;clearTimeout(watchdog);$("start").disabled=false;$("fullscreen").disabled=false;
     sessionStart=Date.now();lastTickAt=sessionStart;clearInterval(sessionTimer);
     sessionTimer=setInterval(()=>{$("timer").textContent="Session: "+fmtTime(Date.now()-sessionStart);if(Date.now()-lastTickAt>30000)recordPlaytime()},1000);
@@ -365,8 +366,9 @@ window.addEventListener("message",e=>{
     try{frame().focus();frame().contentWindow.focus()}catch(err){}
     scheduleAutosave();
     if($("autoFs").checked)toggleFs();
-  }else if(d.emuhub==="ready"){setStatus("Emulator core loaded; preparing game…")}
-  else if(d.emuhub==="cdnfail"){$("start").disabled=false;setStatus("Could not load the emulator files from "+($("cdn").value==="local"?"the bundled data/ folder. Make sure the data folder is next to index.html":"the online CDN. Check your internet connection")+".","bad")}
+    buildVpad(current&&current.system);updateVpadVisibility();
+  }else if(d.emufer==="ready"){setStatus("Emulator core loaded; preparing game…")}
+  else if(d.emufer==="cdnfail"){$("start").disabled=false;setStatus("Could not load the emulator files from "+($("cdn").value==="local"?"the bundled data/ folder. Make sure the data folder is next to index.html":"the online CDN. Check your internet connection")+".","bad")}
 });
 
 /* =====================  BUTTONS  ===================== */
@@ -496,19 +498,19 @@ async function backupSaves(){
   setStatus("Collecting saves…");
   try{
     if(running)await doAutosave("backup");
-    const dbs=(await indexedDB.databases()).filter(d=>d.name&&d.name!=="emuhub-library");
-    const out={emuhub:2,created:new Date().toISOString(),dbs:[],ls:{}};
-    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&(k.startsWith("emuhub.")||k.startsWith("ejs-")))out.ls[k]=localStorage.getItem(k)}
+    const dbs=(await indexedDB.databases()).filter(d=>d.name&&d.name!=="emufer-library");
+    const out={emufer:2,created:new Date().toISOString(),dbs:[],ls:{}};
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&(k.startsWith("emufer.")||k.startsWith("ejs-")))out.ls[k]=localStorage.getItem(k)}
     for(const d of dbs){const db=await idbOpen(d.name);const stores={};for(const sn of db.objectStoreNames)stores[sn]=await readAll(db,sn);out.dbs.push({name:d.name,version:db.version,stores});db.close()}
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(out)],{type:"application/json"}));
-    a.download="emuhub-saves-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    a.download="emufer-saves-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
     setStatus("Backed up autosaves, game saves and settings ("+out.dbs.length+" databases). Keep the file somewhere safe.","good");
   }catch(err){setStatus("Backup failed: "+err.message,"bad")}
 }
 async function restoreSaves(file){
   try{
     const data=JSON.parse(await file.text());
-    if(!data||!(data.emuhub>=1))throw new Error("not an EmuHub backup file");
+    if(!data||!(data.emufer>=1))throw new Error("not an Emufer backup file");
     if(running)stopGame(true);
     for(const d of data.dbs){
       const db=await new Promise((res,rej)=>{const r=indexedDB.open(d.name,d.version);
@@ -519,7 +521,7 @@ async function restoreSaves(file){
       db.close();
     }
     if(data.ls)for(const k in data.ls){try{localStorage.setItem(k,data.ls[k])}catch(e){}}
-    setStatus("Restored. Reloading EmuHub…","good");setTimeout(()=>location.reload(),900);
+    setStatus("Restored. Reloading Emufer…","good");setTimeout(()=>location.reload(),900);
   }catch(err){setStatus("Restore failed: "+err.message,"bad")}
 }
 $("backup").onclick=backupSaves;
@@ -533,6 +535,256 @@ function padCheck(){
 }
 window.addEventListener("gamepadconnected",padCheck);window.addEventListener("gamepaddisconnected",padCheck);
 
+
+/* =====================  VIRTUAL ON-SCREEN CONTROLLER  ===================== */
+/*
+  Shows authentic console button names and maps touches to the same control
+  indices / keyboard keys that EmulatorJS already uses.
+  Visible by default on touch devices / narrow screens; toggleable anywhere.
+*/
+const VPAD_LAYOUTS = {
+  // NES / Famicom / Master System / Game Gear / Atari 2600 style
+  simple: {
+    face: [[8,"A"],[0,"B"]],
+    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Select"]]
+  },
+  // Game Boy / GBC
+  gb: {
+    face: [[8,"A"],[0,"B"]],
+    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Select"]]
+  },
+  // SNES / GBA / PCE / WonderSwan / Neo Geo Pocket
+  snes: {
+    face: [[8,"A"],[0,"B"],[9,"X"],[1,"Y"]],
+    dpad: true, shoulders: [[10,"L"],[11,"R"]], meta: [[3,"Start"],[2,"Select"]]
+  },
+  // N64 (simplified – D-pad + A/B + C-up as X + L/R + Start)
+  n64: {
+    face: [[8,"A"],[0,"B"],[9,"C↑"],[1,"C←"]],
+    dpad: true, shoulders: [[10,"L"],[11,"R"],[12,"Z"]], meta: [[3,"Start"]]
+  },
+  // PlayStation / PSP / Saturn face layout
+  psx: {
+    face: [[8,"○"],[0,"✕"],[9,"△"],[1,"□"]],
+    dpad: true, shoulders: [[10,"L1"],[11,"R1"],[12,"L2"],[13,"R2"]], meta: [[3,"Start"],[2,"Select"]]
+  },
+  // Arcade / Neo Geo
+  arcade: {
+    face: [[8,"A"],[0,"B"],[9,"C"],[1,"D"]],
+    dpad: true, shoulders: [], meta: [[3,"Start"],[2,"Coin"]]
+  },
+  // Generic 6-button (fallback)
+  full: {
+    face: [[8,"A"],[0,"B"],[9,"X"],[1,"Y"]],
+    dpad: true, shoulders: [[10,"L"],[11,"R"],[12,"L2"],[13,"R2"]], meta: [[3,"Start"],[2,"Select"]]
+  }
+};
+
+function vpadLayoutFor(systemId){
+  const map = {
+    nes:"simple", segaMS:"simple", segaGG:"simple", atari2600:"simple",
+    gb:"gb", gbc:"gb",
+    snes:"snes", gba:"snes", pce:"snes", wswan:"snes", wswanc:"snes", ngp:"snes", ngpc:"snes",
+    coleco:"simple", atari7800:"simple", lynx:"snes",
+    n64:"n64",
+    psx:"psx", psp:"psx", segaSaturn:"psx", segaCD:"snes", sega32x:"snes", segaMD:"snes",
+    arcade:"arcade", neogeo:"arcade",
+    nds:"snes", vb:"simple",
+    atari5200:"snes", jaguar:"full", "3do":"psx", pcfx:"psx"
+  };
+  return VPAD_LAYOUTS[map[systemId] || "full"];
+}
+
+let vpadVisible = false;
+let vpadForced = null; // null = auto, true/false = forced
+
+function isTouchDevice(){
+  return ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
+         (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+}
+function isNarrow(){
+  return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+}
+
+function shouldShowVpad(){
+  if(vpadForced !== null) return vpadForced;
+  // Auto: show on touch or narrow screens, or when no physical gamepad
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  return isTouchDevice() || isNarrow() || pads.length === 0;
+}
+
+function keyNameForIndex(idx){
+  const c = (controls[0] || {})[idx];
+  return (c && c.value) || null;
+}
+
+// Map EmulatorJS key names back to KeyboardEvent key/code
+const KEY_TO_EVENT = {
+  "up arrow":{key:"ArrowUp",code:"ArrowUp",keyCode:38},
+  "down arrow":{key:"ArrowDown",code:"ArrowDown",keyCode:40},
+  "left arrow":{key:"ArrowLeft",code:"ArrowLeft",keyCode:37},
+  "right arrow":{key:"ArrowRight",code:"ArrowRight",keyCode:39},
+  "enter":{key:"Enter",code:"Enter",keyCode:13},
+  "space":{key:" ",code:"Space",keyCode:32},
+  "tab":{key:"Tab",code:"Tab",keyCode:9},
+  "backspace":{key:"Backspace",code:"Backspace",keyCode:8},
+  "shift":{key:"Shift",code:"ShiftLeft",keyCode:16},
+  "ctrl":{key:"Control",code:"ControlLeft",keyCode:17},
+  "alt":{key:"Alt",code:"AltLeft",keyCode:18},
+  "escape":{key:"Escape",code:"Escape",keyCode:27}
+};
+// letters & digits
+for(let i=65;i<=90;i++){
+  const ch = String.fromCharCode(i).toLowerCase();
+  KEY_TO_EVENT[ch] = {key:ch, code:"Key"+ch.toUpperCase(), keyCode:i};
+}
+for(let i=0;i<=9;i++){
+  KEY_TO_EVENT[String(i)] = {key:String(i), code:"Digit"+i, keyCode:48+i};
+}
+
+function dispatchEmuKey(keyName, down){
+  if(!keyName) return;
+  const info = KEY_TO_EVENT[keyName.toLowerCase()];
+  if(!info) return;
+  const target = (()=>{
+    try{
+      const fr = frame();
+      if(fr && fr.contentWindow) return fr.contentWindow.document;
+    }catch(e){}
+    return document;
+  })();
+  const ev = new KeyboardEvent(down ? "keydown" : "keyup", {
+    key: info.key, code: info.code, keyCode: info.keyCode, which: info.keyCode,
+    bubbles: true, cancelable: true, view: window
+  });
+  try{ target.dispatchEvent(ev); }catch(e){}
+  // Also try the iframe window itself (some cores listen there)
+  try{
+    const fr = frame();
+    if(fr && fr.contentWindow) fr.contentWindow.dispatchEvent(ev);
+  }catch(e){}
+}
+
+const vpadActive = new Set(); // indices currently held
+
+function vpadPress(idx, down){
+  if(down){
+    if(vpadActive.has(idx)) return;
+    vpadActive.add(idx);
+  }else{
+    if(!vpadActive.has(idx)) return;
+    vpadActive.delete(idx);
+  }
+  const key = keyNameForIndex(idx);
+  dispatchEmuKey(key, down);
+}
+
+function bindVpadButton(el, idx){
+  const start = (e)=>{ e.preventDefault(); e.stopPropagation(); el.classList.add("active"); vpadPress(idx, true); };
+  const end = (e)=>{ e.preventDefault(); e.stopPropagation(); el.classList.remove("active"); vpadPress(idx, false); };
+  el.addEventListener("pointerdown", start);
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+  el.addEventListener("pointerleave", end);
+  // Prevent context menu / long-press
+  el.addEventListener("contextmenu", e=>e.preventDefault());
+}
+
+function buildVpad(systemId){
+  const layout = vpadLayoutFor(systemId || ($("system") && $("system").value) || "nes");
+  const left = $("vpadLeft"), right = $("vpadRight"), top = $("vpadTop");
+  if(!left) return;
+  left.innerHTML = ""; right.innerHTML = ""; top.innerHTML = "";
+
+  // D-pad
+  if(layout.dpad){
+    const dpad = document.createElement("div");
+    dpad.className = "dpad";
+    [["up",4,"▲"],["down",5,"▼"],["left",6,"◀"],["right",7,"▶"]].forEach(([cls,idx,lab])=>{
+      const b = document.createElement("button");
+      b.className = "btn " + cls;
+      b.type = "button";
+      b.textContent = lab;
+      b.setAttribute("aria-label", lab);
+      bindVpadButton(b, idx);
+      dpad.appendChild(b);
+    });
+    left.appendChild(dpad);
+  }
+
+  // Face buttons
+  const face = document.createElement("div");
+  face.className = "face";
+  layout.face.forEach(([idx, lab])=>{
+    const b = document.createElement("button");
+    b.className = "btn b" + idx;
+    b.type = "button";
+    b.textContent = lab;
+    b.setAttribute("aria-label", lab);
+    bindVpadButton(b, idx);
+    face.appendChild(b);
+  });
+  right.appendChild(face);
+
+  // Shoulders + meta (Start/Select) in the top bar
+  const shoulders = document.createElement("div");
+  shoulders.className = "shoulders";
+  (layout.shoulders || []).forEach(([idx, lab])=>{
+    const b = document.createElement("button");
+    b.className = "btn small";
+    b.type = "button";
+    b.textContent = lab;
+    bindVpadButton(b, idx);
+    shoulders.appendChild(b);
+  });
+  top.appendChild(shoulders);
+  (layout.meta || []).forEach(([idx, lab])=>{
+    const b = document.createElement("button");
+    b.className = "btn tiny";
+    b.type = "button";
+    b.textContent = lab;
+    bindVpadButton(b, idx);
+    top.appendChild(b);
+  });
+}
+
+function updateVpadVisibility(){
+  const el = $("vpad");
+  if(!el) return;
+  const show = running && shouldShowVpad();
+  vpadVisible = show;
+  el.classList.toggle("show", show);
+  el.setAttribute("aria-hidden", show ? "false" : "true");
+  const btn = $("vpadToggle");
+  if(btn) btn.textContent = show ? "🎛 Pad ✓" : "🎛 Pad";
+}
+
+function initVpad(){
+  const btn = $("vpadToggle");
+  if(btn){
+    btn.addEventListener("click", ()=>{
+      if(vpadForced === null) vpadForced = !shouldShowVpad();
+      else vpadForced = !vpadForced;
+      updateVpadVisibility();
+      if(vpadForced) buildVpad(current ? current.system : $("system").value);
+    });
+  }
+  // Rebuild when system changes
+  $("system").addEventListener("change", ()=>{
+    if(vpadVisible || shouldShowVpad()) buildVpad($("system").value);
+  });
+  window.addEventListener("resize", ()=>{ updateVpadVisibility(); });
+  window.addEventListener("gamepadconnected", ()=>{ updateVpadVisibility(); });
+  window.addEventListener("gamepaddisconnected", ()=>{ updateVpadVisibility(); });
+  // Release all buttons if the page loses focus
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden){
+      [...vpadActive].forEach(idx => vpadPress(idx, false));
+      document.querySelectorAll("#vpad .btn.active").forEach(b => b.classList.remove("active"));
+    }
+  });
+}
+
 /* =====================  INIT  ===================== */
 (async function init(){
   buildSelects();
@@ -543,10 +795,11 @@ window.addEventListener("gamepadconnected",padCheck);window.addEventListener("ga
   $("asInt").value=store.get("asInt","15");
   ["autoFs","remember","resume","autoCont"].forEach(id=>{const d=id==="autoFs"?false:true;$(id).checked=store.get(id,d)});
   if(store.get("theater",false))$("layout").classList.add("theater");
-  if(location.protocol==="file:")setStatus("Tip: you opened this as a file. Use Start_EmuHub.bat (or serve.py) so the emulator can load.","bad");
+  if(location.protocol==="file:")setStatus("Tip: you opened this as a file. Use serve.py or server.ps1 so the emulator can load.","bad");
   updateBiosHint();initIso();padCheck();
   await Promise.all([DB.open(),STATES.open()]);
   await renderLibrary();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   setupContinue();
+  initVpad();
 })();

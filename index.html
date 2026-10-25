@@ -4,10 +4,320 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Emufer — Cross-device Retro Emulator</title>
-<!-- See full file in repo after push; loading via chunk if needed -->
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#070907;--bg2:#0c100c;--panel:#111611;--panel2:#171d17;--line:#243024;--line2:#2f3f2f;
+  --text:#e8efe8;--muted:#8d9a8d;--gray:#5d685d;--accent:#22c55e;--accent2:#4ade80;--accent-dim:#14532d;--danger:#ef4444;--warn:#eab308;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(ellipse at top,#0f1a10 0,var(--bg) 55%) fixed;color:var(--text);font:15px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh}
+a{color:var(--accent2)}
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px clamp(14px,3vw,40px);border-bottom:1px solid var(--line);background:linear-gradient(#0c100c,#080a08)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#04120a;display:grid;place-items:center;font-weight:900;font-size:20px;box-shadow:0 0 22px #22c55e55}
+h1{margin:0;font-size:26px;letter-spacing:-.5px}
+h1 span{color:var(--accent2)}
+.tag{color:var(--muted);font-size:13px}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line2);color:var(--muted);background:var(--bg2);white-space:nowrap}
+.pill.ok{color:var(--accent2);border-color:var(--accent-dim)}
+main{max-width:1500px;margin:auto;padding:22px clamp(12px,3vw,36px) 48px}
+.layout{display:grid;grid-template-columns:minmax(270px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.layout.theater{grid-template-columns:1fr}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 10px 36px #0006}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--accent2);margin:0 0 12px;font-weight:700;display:flex;align-items:center;gap:10px}
+h2 .grow{flex:1}
+label{display:block;font-weight:600;margin:13px 0 6px;font-size:13px;color:#cbd6cb}
+select,input[type=file],input[type=text],input[type=search]{width:100%;font:inherit;background:var(--bg2);color:var(--text);border:1px solid var(--line2);padding:10px 11px;border-radius:10px;outline:none}
+select:focus,input:focus,button:focus-visible,summary:focus-visible{border-color:var(--accent);box-shadow:0 0 0 2px #22c55e44}
+input[type=file]::file-selector-button{background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:5px 10px;margin-right:10px;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;vertical-align:middle;margin-right:8px}
+.check{display:flex;align-items:center;font-weight:500;margin:10px 0 0;cursor:pointer}
+button{font:inherit;cursor:pointer;border:1px solid var(--accent);border-radius:10px;background:var(--accent);color:#04120a;font-weight:750;padding:10px 14px;transition:.12s}
+button:hover:not(:disabled){background:var(--accent2);transform:translateY(-1px)}
+button.secondary{background:var(--panel2);color:var(--text);border-color:var(--line2)}
+button.secondary:hover:not(:disabled){border-color:var(--accent);background:#1d261d}
+button.danger{background:transparent;color:var(--danger);border-color:#5b1f1f}
+button.danger:hover:not(:disabled){background:#2a1010}
+button.small{padding:5px 10px;font-size:12px;border-radius:8px}
+button:disabled{opacity:.4;cursor:not-allowed}
+.wide{width:100%;margin-top:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.status{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);color:var(--muted);min-height:42px;font-size:13px}
+.status.good{border-color:var(--accent-dim);color:var(--accent2)}
+.status.bad{border-color:#5b1f1f;color:#fca5a5}
+.muted{font-size:13px;color:var(--muted)}
+details{margin-top:14px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+summary{cursor:pointer;padding:10px 12px;font-weight:650;font-size:13px;color:#cbd6cb;list-style:none}
+summary::before{content:"▸ ";color:var(--accent)}details[open] summary::before{content:"▾ "}
+details .inner{padding:0 12px 12px}
+.note{font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);padding:10px 12px;border-radius:10px;margin-top:12px}
+.note strong{color:#cbd6cb}
+#stage{position:relative;width:100%;height:clamp(360px,68vh,760px);background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.theater #stage{height:clamp(420px,80vh,900px)}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;display:block}
+#stage:fullscreen{height:100vh;border-radius:0;border:0}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:24px;background:
+  repeating-linear-gradient(0deg,#ffffff05 0 2px,transparent 2px 4px)}
+.empty strong{color:var(--text);font-size:18px}
+.empty .big{font-size:46px;color:var(--accent);text-shadow:0 0 24px #22c55e88;margin-bottom:6px}
+.drop{outline:2px dashed var(--accent);outline-offset:-8px}
+#hud{position:absolute;left:10px;top:10px;font:12px/1 ui-monospace,Consolas,monospace;color:var(--accent2);background:#000a;padding:5px 8px;border-radius:6px;display:none;pointer-events:none;z-index:2}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.toolbar button{flex:1 1 110px}
+.toolbar-info{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px}
+.library{margin-top:20px}
+.lib-tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.lib-tools input{flex:2 1 220px}.lib-tools select{flex:1 1 150px;width:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;position:relative;transition:.12s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card .art{height:62px;border-radius:8px;display:grid;place-items:center;font-weight:900;font-size:22px;letter-spacing:1px;color:#04120a;background:linear-gradient(135deg,var(--accent),#14532d)}
+.card .name{font-weight:650;word-break:break-word;line-height:1.25;max-height:2.5em;overflow:hidden}
+.card .meta{font-size:12px;color:var(--muted)}
+.card .btns{display:flex;gap:6px;margin-top:4px}
+.card .btns .play{flex:1}
+.card .star{position:absolute;right:8px;top:8px;background:#000a;border:0;color:var(--gray);font-size:16px;padding:2px 7px;border-radius:7px;line-height:1.2}
+.card .star.on{color:var(--warn)}
+.lib-empty{color:var(--muted);text-align:center;padding:28px 10px;border:1px dashed var(--line2);border-radius:12px}
+kbd{background:var(--panel2);border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font:12px ui-monospace,Consolas,monospace;color:var(--text)}
+table.keys{border-collapse:collapse;width:100%;font-size:13px}
+table.keys td,table.keys th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+table.keys th{color:var(--accent2);font-weight:650}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--accent-dim);border-radius:16px;max-width:560px;width:calc(100% - 28px);padding:20px}
+dialog::backdrop{background:#000b}
+footer{margin-top:24px;color:var(--gray);font-size:12px;text-align:center}
+@media(max-width:900px){.layout{grid-template-columns:1fr}#stage{height:clamp(300px,56vh,600px)}}
+
+.banner{display:none;align-items:center;gap:14px;flex-wrap:wrap;background:linear-gradient(90deg,#0f2417,#111611);border:1px solid var(--accent-dim);border-radius:14px;padding:12px 16px;margin-bottom:18px}
+.banner.show{display:flex}.banner .t{flex:1 1 240px}.banner strong{color:var(--accent2)}
+.banner button{width:auto}
+#saveInd{color:var(--accent2)}
+.ctl-tabs{display:flex;gap:6px;margin:10px 0}.ctl-tabs button{flex:1;margin:0}
+.ctl-tabs button.on{background:var(--accent);color:#04120a;border-color:var(--accent)}
+table.ctl{width:100%;border-collapse:collapse;font-size:13px}
+table.ctl td,table.ctl th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left}
+table.ctl th{color:var(--accent2)}
+table.ctl .cell{display:block;width:100%;text-align:center;background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:7px;padding:4px 6px;font-weight:600;min-height:28px}
+table.ctl .cell.wait{border-color:var(--warn);color:var(--warn);animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.45}}
+.ctl-scroll{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+dialog.big{max-width:720px}
+.badge{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--accent-dim);color:var(--accent2);margin-left:6px}
+
+/* ===== Virtual on-screen controller (cross-device) ===== */
+#vpad{
+  position:absolute; inset:0; pointer-events:none; z-index:5;
+  display:none; touch-action:none; user-select:none;
+}
+#vpad.show{display:block}
+#vpad .zone{position:absolute; pointer-events:auto; display:flex; align-items:center; justify-content:center}
+#vpad .left{left:8px; bottom:12px; width:42%; max-width:200px; height:42%; max-height:180px}
+#vpad .right{right:8px; bottom:12px; width:42%; max-width:200px; height:42%; max-height:180px}
+#vpad .top{left:50%; transform:translateX(-50%); bottom:calc(42% + 18px); display:flex; gap:10px; pointer-events:auto}
+#vpad .btn{
+  width:48px; height:48px; border-radius:50%;
+  background:rgba(20,30,20,.72); border:2px solid rgba(74,222,128,.45);
+  color:#e8efe8; font:700 13px/1 system-ui,sans-serif;
+  display:grid; place-items:center; backdrop-filter:blur(4px);
+  box-shadow:0 4px 14px #0008, inset 0 1px 0 #ffffff22;
+  transition:transform .08s, background .08s, border-color .08s;
+  -webkit-tap-highlight-color:transparent;
+}
+#vpad .btn:active, #vpad .btn.active{
+  transform:scale(.92); background:rgba(34,197,94,.55); border-color:#4ade80;
+}
+#vpad .btn.small{width:40px; height:40px; font-size:11px}
+#vpad .btn.tiny{width:34px; height:34px; font-size:10px; border-radius:8px}
+#vpad .dpad{
+  position:relative; width:120px; height:120px;
+}
+#vpad .dpad .btn{
+  position:absolute; width:40px; height:40px; border-radius:8px;
+}
+#vpad .dpad .up{top:0; left:50%; transform:translateX(-50%)}
+#vpad .dpad .down{bottom:0; left:50%; transform:translateX(-50%)}
+#vpad .dpad .left{left:0; top:50%; transform:translateY(-50%)}
+#vpad .dpad .right{right:0; top:50%; transform:translateY(-50%)}
+#vpad .dpad .up:active, #vpad .dpad .up.active{transform:translateX(-50%) scale(.92)}
+#vpad .dpad .down:active, #vpad .dpad .down.active{transform:translateX(-50%) scale(.92)}
+#vpad .dpad .left:active, #vpad .dpad .left.active{transform:translateY(-50%) scale(.92)}
+#vpad .dpad .right:active, #vpad .dpad .right.active{transform:translateY(-50%) scale(.92)}
+#vpad .face{
+  position:relative; width:130px; height:130px;
+}
+#vpad .face .btn{position:absolute; width:44px; height:44px}
+#vpad .face .b0{bottom:4px; left:50%; transform:translateX(-50%)} /* B / Cross */
+#vpad .face .b1{top:50%; left:4px; transform:translateY(-50%)}  /* Y / Square */
+#vpad .face .b8{top:4px; left:50%; transform:translateX(-50%)}  /* A / Circle */
+#vpad .face .b9{top:50%; right:4px; transform:translateY(-50%)} /* X / Triangle */
+#vpad .face .b0:active, #vpad .face .b0.active{transform:translateX(-50%) scale(.92)}
+#vpad .face .b1:active, #vpad .face .b1.active{transform:translateY(-50%) scale(.92)}
+#vpad .face .b8:active, #vpad .face .b8.active{transform:translateX(-50%) scale(.92)}
+#vpad .face .b9:active, #vpad .face .b9.active{transform:translateY(-50%) scale(.92)}
+#vpad .shoulders{display:flex; gap:8px}
+#vpad .hide{display:none !important}
+#vpadToggle{flex:0 0 auto}
+@media(max-width:600px){
+  #vpad .btn{width:52px; height:52px}
+  #vpad .dpad{width:132px; height:132px}
+  #vpad .dpad .btn{width:44px; height:44px}
+  #vpad .face{width:140px; height:140px}
+  #vpad .face .btn{width:48px; height:48px}
+  #stage{height:clamp(280px,50vh,520px)}
+  .toolbar button{flex:1 1 90px; font-size:13px; padding:8px 6px}
+}
+@media(max-width:400px){
+  #vpad .left, #vpad .right{width:46%}
+}
+
+</style>
 </head>
 <body>
-<p>Placeholder - will be replaced</p>
+<header>
+  <div class="logo"><div class="logo-mark">E</div><div><h1>Emu<span>fer</span></h1><div class="tag">Cross-device retro emulator · phone, tablet &amp; PC</div></div></div>
+  <div class="hdr-right">
+    <span class="pill" id="padPill">🎮 No controller</span>
+    <span class="pill" id="isoPill" title="Cross-origin isolation (needed for PSP and DOS)">Isolation: off</span>
+    <button class="secondary small" id="ctlBtn">🎛 Controls</button><button class="secondary small" id="helpBtn">Help</button>
+  </div>
+</header>
+<main>
+<div class="banner" id="banner"><div class="t" id="bannerText"></div><button id="bannerGo">▶ Continue</button><button class="secondary" id="bannerNo">Dismiss</button></div>
+<div class="layout" id="layout">
+  <section class="panel" id="setup">
+    <h2>Game setup</h2>
+    <label for="system">System</label>
+    <select id="system"></select>
+    <label for="rom">Game file</label>
+    <input id="rom" type="file" multiple>
+    <div class="muted" id="romHint" style="margin-top:6px">…or drag &amp; drop a file anywhere on this page. The console is detected automatically from the file's contents. For CD games with separate <b>.cue + .bin</b> files, select both at once.</div>
+
+    <details id="biosBox">
+      <summary>BIOS / extra file (optional)</summary>
+      <div class="inner">
+        <div class="muted" id="biosNeed" style="margin:4px 0 8px"></div>
+        <input id="bios" type="file">
+      </div>
+    </details>
+
+    <details>
+      <summary>Display &amp; audio</summary>
+      <div class="inner">
+        <label for="shader">Video filter</label>
+        <select id="shader">
+          <option value="">None (sharp pixels)</option>
+          <option value="crt-easymode.glsl">CRT – Easymode</option>
+          <option value="crt-aperture.glsl">CRT – Aperture</option>
+          <option value="crt-geom.glsl">CRT – Geom</option>
+          <option value="crt-mattias.glsl">CRT – Mattias</option>
+          <option value="sabr.glsl">SABR smoothing</option>
+          <option value="2xScaleHQ.glsl">2xScaleHQ</option>
+        </select>
+        <label for="volume">Volume <span id="volLbl" class="muted"></span></label>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8">
+        <label for="cdn">Emulator core source</label>
+        <select id="cdn">
+          <option value="local">Bundled with Emufer (works offline)</option>
+          <option value="https://cdn.emulatorjs.org/stable/data/">Online – stable (needs internet)</option>
+          <option value="https://cdn.emulatorjs.org/latest/data/">Online – latest (needs internet)</option>
+        </select>
+        <label class="check"><input type="checkbox" id="autoFs"> Go fullscreen when game starts</label>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Autosave &amp; resume</summary>
+      <div class="inner">
+        <label for="asInt">Autosave every</label>
+        <select id="asInt"><option value="0">Off</option><option value="5">5 seconds</option><option value="15" selected>15 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option></select>
+        <label class="check"><input type="checkbox" id="resume" checked> Resume from last autosave</label>
+        <label class="check"><input type="checkbox" id="autoCont" checked> Re-open my last game when Emufer starts</label>
+        <div class="muted" style="margin-top:8px">Each autosave overwrites the previous one for that game. It also saves when you close or reload the tab.</div>
+      </div>
+    </details>
+    <label class="check"><input type="checkbox" id="remember" checked> Save this game to my library</label>
+    <button class="wide" id="start">▶ Load game</button>
+    <div id="status" class="status" role="status">Choose a system and a game file to begin.</div>
+
+    <div class="note"><strong>Save safety</strong><br>Saves live in this browser's storage. Download save states from the emulator menu regularly — clearing site data or private browsing erases them. Use <em>Back up saves</em> below to export everything at once.</div>
+    <div class="row"><button class="secondary small" id="backup">Back up saves</button><button class="secondary small" id="restore">Restore saves</button></div>
+    <input type="file" id="restoreFile" accept=".json" hidden>
+    <div class="note"><strong>Legal</strong><br>Emufer contains no games or BIOS files. Only use files you are legally entitled to use.</div>
+  </section>
+
+  <section class="panel" id="playerPanel">
+    <h2><span>Player</span><span class="grow"></span><span class="muted" id="nowPlaying" style="text-transform:none;letter-spacing:0;font-weight:500"></span></h2>
+    <div id="stage">
+      <div id="hud"></div>
+      <div id="vpad" aria-hidden="true">
+        <div class="top" id="vpadTop"></div>
+        <div class="zone left" id="vpadLeft"></div>
+        <div class="zone right" id="vpadRight"></div>
+      </div>
+
+      <div class="empty" id="empty"><div><div class="big">▶</div><strong>Your game appears here</strong><p>Pick a system &amp; file, or click a game in your library.</p><p class="muted">Drop a ROM onto this window to start instantly.</p></div></div>
+    </div>
+    <div class="toolbar">
+      <button class="secondary" id="fullscreen" disabled>⛶ Fullscreen</button>
+      <button class="secondary" id="reload" disabled>⟳ Restart</button>
+      <button class="secondary" id="stop" disabled>■ Stop</button>
+      <button class="secondary" id="theater">▭ Theater</button>
+      <button class="secondary" id="hudBtn">FPS</button>
+      <button class="secondary" id="vpadToggle" title="On-screen controls">🎛 Pad</button>
+    </div>
+    <div class="toolbar-info muted"><span><span id="timer">Session: 0:00</span> · <span id="saveInd">💾 not saved yet</span></span><span>Emulator menu (in the player) has save slots, cheats &amp; more.</span></div>
+  </section>
+</div>
+
+<section class="panel library" id="library">
+  <h2><span>Library</span><span class="grow"></span><span class="muted" id="storageInfo" style="text-transform:none;letter-spacing:0;font-weight:500"></span></h2>
+  <div class="lib-tools">
+    <input type="search" id="search" placeholder="Search games…">
+    <select id="libSystem"><option value="">All systems</option></select>
+    <select id="libSort">
+      <option value="recent">Recently played</option>
+      <option value="added">Recently added</option>
+      <option value="name">Name A–Z</option>
+      <option value="time">Most played (time)</option>
+    </select>
+    <label class="check" style="margin:0"><input type="checkbox" id="favOnly">Favorites</label>
+  </div>
+  <div class="grid" id="grid"></div>
+</section>
+<footer>Emufer is a cross-device frontend. Emulation by <a href="https://emulatorjs.org" target="_blank" rel="noopener">EmulatorJS</a> (loaded from its CDN — internet required for core files).</footer>
+</main>
+
+<dialog id="ctl" class="big">
+  <h2>Controls <span class="grow"></span><span class="muted" style="text-transform:none;letter-spacing:0">saved on this PC</span></h2>
+  <div class="ctl-tabs" id="ctlTabs"></div>
+  <div class="muted" style="margin-bottom:8px">Click a box, then press a key (keyboard) or a controller button / stick direction (gamepad). <kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears the box.</div>
+  <div class="ctl-scroll"><table class="ctl" id="ctlTable"></table></div>
+  <div class="row3"><button class="secondary" id="ctlDefault">Reset defaults</button><button class="secondary" id="ctlClear">Clear player</button><button id="ctlDone">Done</button></div>
+</dialog>
+<dialog id="help">
+  <h2>Controls &amp; help</h2>
+  <table class="keys">
+    <tr><th>Action</th><th>Default key</th></tr>
+    <tr><td>D-pad</td><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td></tr>
+    <tr><td>A / B</td><td><kbd>X</kbd> / <kbd>Z</kbd></td></tr>
+    <tr><td>X / Y</td><td><kbd>S</kbd> / <kbd>A</kbd></td></tr>
+    <tr><td>Start / Select</td><td><kbd>Enter</kbd> / <kbd>V</kbd></td></tr>
+    <tr><td>Shoulders L / R</td><td><kbd>Q</kbd> / <kbd>E</kbd></td></tr>
+    <tr><td>Fullscreen (Emufer)</td><td><kbd>F</kbd> (when focus is outside the game)</td></tr>
+    <tr><td>Rebind keys / gamepad</td><td>🎛 Controls button (top right)</td></tr>
+  </table>
+  <p class="muted">Gamepads are detected automatically — press any button on the controller to wake it up.</p>
+  <p class="muted"><strong>On-screen controls:</strong> On phones, tablets, or when no physical controller is connected, virtual buttons appear over the game. They use the same names as the real console (A/B, ✕/○/□/△, Start, Select, L/R…). Toggle with the <em>Pad</em> button in the toolbar.</p>
+  <p class="muted"><strong>PSP &amp; DOS</strong> need a cross-origin-isolated page — this works automatically when you start Emufer with the included launcher in Chrome or Edge.</p>
+  <p class="muted"><strong>Systems needing BIOS:</strong> PlayStation (recommended), Sega CD, Saturn, Neo Geo (neogeo.zip), PC-FX, 3DO, Amiga, Lynx (optional) and others. Use “BIOS / extra file” in the setup panel.</p>
+  <button class="wide" id="helpClose">Close</button>
+</dialog>
+
 <script src="detect.js"></script>
 <script src="app.js"></script>
 </body>
