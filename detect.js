@@ -1,4 +1,4 @@
-/* EmuHub console auto-detection.
+/* Emufer console auto-detection.
    Looks at file CONTENT first (headers / magic bytes / disc volume info / zip contents),
    then falls back to the file extension and finally to filename hints.
    detectSystem(file) -> Promise<{id, confidence:"high"|"medium"|"low", why}|null> */
